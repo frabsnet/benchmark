@@ -16,13 +16,21 @@ if ($Code -notmatch '^[A-Z2-9]{9}$') {
   Write-Host 'Get your code at https://benchmark.frabs.net'
   return
 }
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# TLS 1.2 by number, so older .NET versions without the name still get it.
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072 } catch { }
 $Api = "https://api.frabs.net/v1/tools/bench/$Code/event"
 $Work = Join-Path ([IO.Path]::GetTempPath()) ("frabs-benchmark-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Path $Work | Out-Null
 
 function Send($body) {
-  try { Invoke-RestMethod -Uri $Api -Method Post -ContentType 'application/json' -Body ($body | ConvertTo-Json -Depth 5 -Compress) -TimeoutSec 10 | Out-Null } catch { }
+  $json = $body | ConvertTo-Json -Depth 5 -Compress
+  try { Invoke-RestMethod -Uri $Api -Method Post -ContentType 'application/json' -Body $json -TimeoutSec 10 | Out-Null }
+  catch { try { $w = New-Object Net.WebClient; $w.Headers['Content-Type'] = 'application/json'; $w.UploadString($Api, $json) | Out-Null } catch { } }
+}
+# System facts: CIM where it exists, WMI on older Windows.
+function Info($class, $filter) {
+  if (Get-Command Get-CimInstance -ErrorAction SilentlyContinue) { if ($filter) { Get-CimInstance $class -Filter $filter } else { Get-CimInstance $class } }
+  else { if ($filter) { Get-WmiObject $class -Filter $filter } else { Get-WmiObject $class } }
 }
 function Step($key, $state, $detail, $shown) {
   Send @{ step = $key; state = $state; detail = [string]$detail }
@@ -100,8 +108,8 @@ try {
   Send @{ state = 'start'; platform = 'windows' }
 
   Step 'system' 'running' 'Reading the system'
-  $os = Get-CimInstance Win32_OperatingSystem; $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1; $cs = Get-CimInstance Win32_ComputerSystem
-  $drive = Get-CimInstance Win32_LogicalDisk -Filter ("DeviceID='{0}'" -f ([IO.Path]::GetPathRoot($Work).TrimEnd('\')))
+  $os = Info Win32_OperatingSystem; $cpu = Info Win32_Processor | Select-Object -First 1; $cs = Info Win32_ComputerSystem
+  $drive = Info Win32_LogicalDisk ("DeviceID='{0}'" -f ([IO.Path]::GetPathRoot($Work).TrimEnd('\')))
   $cores = [Environment]::ProcessorCount
   $free = [math]::Floor($drive.FreeSpace / 1MB)
   $virt = if ($cs.Model -match 'Virtual|VMware|KVM|HVM|Xen|QEMU') { $cs.Model } else { 'none' }

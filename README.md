@@ -9,8 +9,10 @@ command it shows you on the server.
 **Linux**
 
 ```sh
-curl -sL https://raw.githubusercontent.com/frabsnet/benchmark/main/run.sh | bash -s YOURCODE
+curl -sL https://raw.githubusercontent.com/frabsnet/benchmark/main/run.sh | sh -s YOURCODE
 ```
+
+No curl? `wget -qO- https://raw.githubusercontent.com/frabsnet/benchmark/main/run.sh | sh -s YOURCODE`
 
 **Windows** (PowerShell)
 
@@ -22,7 +24,7 @@ curl -sL https://raw.githubusercontent.com/frabsnet/benchmark/main/run.sh | bash
 
 | Test | How |
 | --- | --- |
-| CPU, single core | SHA-256 hashing on one core, in MB/s |
+| CPU, single core | SHA-256 hashing on one core, in MB/s (another hash if the server has no `sha256sum`) |
 | CPU, all cores | The same on every core at once |
 | Memory | Copying through RAM, in MB/s |
 | Disk write and read | A test file up to 1 GB (never more than a tenth of the free space), direct I/O where the filesystem allows it |
@@ -35,8 +37,10 @@ A run takes about two to three minutes.
 
 ## Your server, untouched
 
-- Nothing is installed. Linux needs only `bash`, `curl`, `dd`, `sha256sum` and `awk`; Windows
-  needs only PowerShell.
+- Nothing is installed. It is plain `sh`, so it runs on any Linux (Debian, Ubuntu, RHEL, Alpine,
+  BusyBox, minimal containers), using only what is already there: `curl` or `wget`, `dd`, and any
+  one of `sha256sum`, `sha1sum`, `md5sum`, `cksum` or `gzip`. Windows needs only PowerShell 3 or
+  later.
 - Everything it writes goes in one temporary folder (`/var/tmp/frabs-benchmark.*` or your
   Windows temp folder), which is deleted when it finishes, fails or is stopped.
 - No root or Administrator rights are needed.
